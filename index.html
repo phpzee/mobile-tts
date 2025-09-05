@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile TTS</title>
+<style>
+body { font-family: Arial; padding: 15px; margin:0; background: #f2f2f2; }
+h2 { text-align: center; color: #333; margin-bottom: 15px; }
+textarea { width: 100%; height: 180px; font-size: 18px; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #ccc; resize: none; }
+select, input { width: 100%; font-size: 16px; padding: 10px; margin: 6px 0; border-radius: 10px; border: 1px solid #ccc; }
+button { width: 100%; font-size: 18px; padding: 14px; margin-top: 10px; background-color: #28a745; color: white; border: none; border-radius: 10px; cursor: pointer; }
+button:active { background-color: #218838; }
+#highlight-container { max-height: 180px; overflow-y: auto; padding: 10px; background: #fff; border-radius: 10px; border: 1px solid #ccc; margin-top: 10px; font-size: 16px; line-height: 1.5; }
+.highlight-word { background-color: yellow; }
+@media(max-width:600px){
+    textarea { font-size:16px; height:150px; }
+    button { font-size:16px; padding:12px; }
+}
+</style>
+</head>
+<body>
+<h2>Mobile TTS (Render Backend)</h2>
+
+<textarea id="text" placeholder="Type text here in Hindi, English, Urdu, or Marathi."></textarea>
+
+<label for="language">Choose Language:</label>
+<select id="language">
+    <option value="hi" selected>Hindi</option>
+    <option value="en">English</option>
+    <option value="ur">Urdu</option>
+    <option value="mr">Marathi</option>
+</select>
+
+<label for="rate">Speed:</label>
+<input type="range" id="rate" min="0.5" max="2" value="1" step="0.05">
+
+<button onclick="speakText()">Speak</button>
+<button onclick="downloadTTS()">Download MP3</button>
+
+<div id="highlight-container"></div>
+<audio id="audio-preview" controls style="width:100%; margin-top:10px;"></audio>
+
+<script>
+const BACKEND_URL = 'https://mobile-tts.onrender.com/tts'; // <-- replace with your Render URL
+
+function highlightWords(text){
+    const container = document.getElementById("highlight-container");
+    container.innerHTML = '';
+    text.split(' ').forEach((word,i)=>{
+        const span = document.createElement('span');
+        span.textContent = word + ' ';
+        span.id = 'word-' + i;
+        container.appendChild(span);
+    });
+}
+
+async function speakText(){
+    const text = document.getElementById("text").value.trim();
+    if(!text){ alert("Please enter text."); return; }
+    const lang = document.getElementById("language").value;
+    const speed = parseFloat(document.getElementById("rate").value);
+
+    highlightWords(text);
+
+    try{
+        const response = await fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({text, lang, speed})
+        });
+
+        if(!response.ok){
+            const errorData = await response.json();
+            console.error(errorData);
+            alert("Server error: " + (errorData.error || response.statusText));
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        const audio = document.getElementById("audio-preview");
+        audio.src = url;
+        audio.play();
+
+        // Highlight animation
+        const words = text.split(' ');
+        let index = 0;
+        const interval = setInterval(()=>{
+            if(index>=words.length){ clearInterval(interval); return; }
+            const span = document.getElementById('word-'+index);
+            if(span){ span.classList.add('highlight-word'); span.scrollIntoView({behavior:'smooth',block:'center'});}
+            if(index>0){ const prev = document.getElementById('word-'+(index-1)); if(prev) prev.classList.remove('highlight-word'); }
+            index++;
+        }, 400 / speed);
+
+    }catch(e){
+        console.error(e);
+        alert("Request failed: "+ e.message);
+    }
+}
+
+async function downloadTTS(){
+    const text = document.getElementById("text").value.trim();
+    if(!text){ alert("Please enter text."); return; }
+    const lang = document.getElementById("language").value;
+    const speed = parseFloat(document.getElementById("rate").value);
+
+    try{
+        const response = await fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({text, lang, speed})
+        });
+
+        if(!response.ok){
+            const errorData = await response.json();
+            console.error(errorData);
+            alert("Server error: " + (errorData.error || response.statusText));
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'speech.mp3';
+        a.click();
+
+    }catch(e){
+        console.error(e);
+        alert("Request failed: "+ e.message);
+    }
+}
+</script>
+</body>
+</html>
