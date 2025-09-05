@@ -1,0 +1,4 @@
+Flask
+gTTS
+gunicorn
+flask_cors
